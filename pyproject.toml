@@ -1,11 +1,13 @@
 [build-system]
-requires = ["setuptools >= 80.9.0"]
-build-backend = "setuptools.build_meta"
+requires = ["scikit-build-core >= 0.11.6"]
+build-backend = "scikit_build_core.build"
 
 [project]
 name = "findmytau"
 version = "0.0.1"
 dependencies = [
+  "cmake >= 4.1.0",
+  "ninja >= 1.13.0",
   "numpy >= 2.3.2",
 ]
 requires-python = ">=3.11"
@@ -34,3 +36,20 @@ Repository = "https://github.com/rads2995/RiskyQuant"
 
 [project.scripts]
 findmytau = "findmytau.main:main"
+
+[tool.scikit-build]
+build.verbose = true
+minimum-version = "build-system.requires"
+cmake.version = ">=4.1"
+ninja.version = ">=1.13"
+
+cmake.source-dir = "thirdparty/xgboost"
+cmake.build-type = "Release"
+
+build-dir = "build/{wheel_tag}"
+
+build.tool-args = ["-j6"]
+
+[tool.scikit-build.cmake.define]
+USE_CUDA = "OFF"
+PLUGIN_SYCL = "OFF"
