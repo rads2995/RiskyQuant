@@ -51,4 +51,4 @@ build-dir = "build/{wheel_tag}"
 build.tool-args = ["-j6"]
 
 [tool.scikit-build.cmake.define]
-PLUGIN_SYCL = "OFF"
+PLUGIN_SYCL = "ON"
