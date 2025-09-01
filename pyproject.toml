@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools >= 80.9.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "findmytau"
+version = "0.0.1"
+dependencies = [
+  "numpy >= 2.3.2",
+]
+requires-python = ">=3.11"
+authors = [
+  {name = "Rodrigo Duran", email = "rads2995@gmail.com"},
+]
+maintainers = [
+  {name = "Rodrigo Duran", email = "rads2995@gmail.com"},
+]
+description = "Risk-Aware Optimal Stopping via Gradient-Boosted Quantile Regression."
+readme = "README.md"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+keywords = ["Optimal Stopping", "Gradient Boosting", "Quantile Regression"]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Programming Language :: Python"
+]
+
+[project.urls]
+# Homepage = ""
+# Documentation = ""
+Repository = "https://github.com/rads2995/RiskyQuant"
+# "Bug Tracker" = ""
+# Changelog = ""
+
+[project.scripts]
+findmytau = "findmytau.main:main"
