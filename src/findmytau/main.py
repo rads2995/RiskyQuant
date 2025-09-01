@@ -1,2 +1,7 @@
+
+from .sde import SDE
+
 def main():
-    print("Hello!")
+    sde: SDE = SDE()
+    sde.simulate()
+    print(sde.optimal_stopping())
