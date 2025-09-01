@@ -1,14 +1,13 @@
 import numpy as np
 import numpy.typing as npt
-
-from sklearn.ensemble import HistGradientBoostingRegressor
+import xgboost as xgb
 
 class SDE:
     def __init__(
         self,
-        N: int = 10,
+        N: int = 10000,
         M: int = 1000,
-        mu: float = 1.0,
+        mu: float = 0.05,
         sigma: float = 0.2,
         x0: float = 1.0,
         T: float = 1.0
@@ -38,24 +37,30 @@ class SDE:
 
     def optimal_stopping(self):
 
-        V = np.maximum(1.5 - self.X[-1, :], 0.0)
+        V = np.maximum(1.0 - self.X[-1, :], 0.0)
 
         for t in range(self.M - 1, -1, -1):
-            item = (1.5 - self.X[t, :]) > 0.0
+            item = (1.0 - self.X[t, :]) > 0.0
             if not np.any(item):
                 continue
             
             features = self.X[t, item].reshape(-1, 1)
             Y = V[item]
 
-            # Quantile Gradient Boosting
-            model = HistGradientBoostingRegressor(
-                loss='quantile', quantile=0.5
+            # Quantile Gradient Boosting with XGBoost
+            model = xgb.XGBRegressor(
+                objective="reg:quantileerror",
+                tree_method='hist',
+                quantile_alpha=0.5,
+                learning_rate=0.04,
+                max_depth = 5,
+                device ='cpu'
             )
+
             model.fit(features, Y)
             C = model.predict(features)           # continuation estimate at quantile tau
 
-            exercise_payoff = np.maximum(1.5 - self.X[t, item], 0.0)
+            exercise_payoff = np.maximum(1.0 - self.X[t, item], 0.0)
             exercise = exercise_payoff >= C
             V[item] = np.where(exercise, exercise_payoff, V[item])  # stop vs continue
 
