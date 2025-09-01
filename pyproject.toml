@@ -51,5 +51,6 @@ build-dir = "build/{wheel_tag}"
 build.tool-args = ["-j6"]
 
 [tool.scikit-build.cmake.define]
-USE_CUDA = "OFF"
-PLUGIN_SYCL = "OFF"
+USE_HIP = "ON"
+CMAKE_HIP_ARCHITECTURES="gfx1010"
+USE_RCCL= "ON"
