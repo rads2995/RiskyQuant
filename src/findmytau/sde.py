@@ -1,6 +1,7 @@
 import numpy as np
 import numpy.typing as npt
 import xgboost as xgb
+from sklearn.model_selection import train_test_split
 
 class SDE:
     def __init__(
@@ -25,6 +26,8 @@ class SDE:
         self.X: npt.NDArray[float] = np.zeros((self.M + 1, self.N), dtype=float)
         self.X[0, :] = self.x0
 
+        self.alpha: list[float] = [0.05, 0.5, 0.95]
+
     def simulate(self):
 
         rng = np.random.default_rng()
@@ -45,21 +48,32 @@ class SDE:
             features = self.X[t, item].reshape(-1, 1)
             Y = discount * V[item]
 
-            # Quantile Gradient Boosting with XGBoost
-            model = xgb.XGBRegressor(
-                objective="reg:quantileerror",
-                tree_method='hist',
-                quantile_alpha=0.5,
-                learning_rate=0.04,
-                max_depth = 5,
-                device ='cpu'
+            X_train, X_test, Y_train, Y_test = train_test_split(
+                features, Y, test_size=0.2, random_state=42
+            )
+            
+            dtrain = xgb.QuantileDMatrix(X_train, Y_train)
+            dtest = xgb.QuantileDMatrix(X_test, Y_test, ref=dtrain)
+
+            model = xgb.train(
+                {
+                "objective": "reg:quantileerror",
+                "tree_method": 'hist',
+                "quantile_alpha": self.alpha,
+                "learning_rate": 0.04,
+                "max_depth": 5,
+                "device": "cpu"
+                },
+                dtrain,
+                num_boost_round=32,
+                early_stopping_rounds=2,
+                evals=[(dtrain, "Train"), (dtest, "Test")]
             )
 
-            model.fit(features, Y)
-            C = model.predict(features)           # continuation estimate at quantile tau
+            C = model.inplace_predict(features)[:, 1]
 
             exercise_payoff = np.maximum(1.0 - self.X[t, item], 0.0)
             exercise = exercise_payoff >= C
-            V[item] = np.where(exercise, exercise_payoff, V[item])  # stop vs continue
+            V[item] = np.where(exercise, exercise_payoff, V[item])
 
         return np.mean(V)
