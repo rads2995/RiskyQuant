@@ -52,4 +52,5 @@ build-dir = "build/{wheel_tag}"
 build.tool-args = ["-j6"]
 
 [tool.scikit-build.cmake.define]
+# 2.1.4 Patch Release: SYCL plugin only supports inference not training
 PLUGIN_SYCL = "OFF"

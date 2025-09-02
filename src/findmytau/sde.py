@@ -20,24 +20,22 @@ class SDE:
         self.x0: float = x0
 
         self.T: float = T
+        self.dt = self.T / self.M
 
         self.X: npt.NDArray[float] = np.zeros((self.M + 1, self.N), dtype=float)
         self.X[0, :] = self.x0
 
     def simulate(self):
 
-        dt = self.T / self.M
-
         rng = np.random.default_rng()
         for t in range(self.M):
-            dW_X = rng.normal(loc=0.0, scale=np.sqrt(dt), size=self.N)
-            self.X[t + 1, :] = self.X[t, :] * np.exp((self.mu - 0.5 * self.sigma**2) * dt + self.sigma * dW_X)
-
-        t = np.linspace(0.0, self.T, self.M + 1)
+            dW_X = rng.normal(loc=0.0, scale=np.sqrt(self.dt), size=self.N)
+            self.X[t + 1, :] = self.X[t, :] * np.exp((self.mu - 0.5 * self.sigma**2) * self.dt + self.sigma * dW_X)
 
     def optimal_stopping(self):
 
         V = np.maximum(1.0 - self.X[-1, :], 0.0)
+        discount: float = np.exp(-0.05 * self.dt)
 
         for t in range(self.M - 1, -1, -1):
             item = (1.0 - self.X[t, :]) > 0.0
@@ -45,7 +43,7 @@ class SDE:
                 continue
             
             features = self.X[t, item].reshape(-1, 1)
-            Y = V[item]
+            Y = discount * V[item]
 
             # Quantile Gradient Boosting with XGBoost
             model = xgb.XGBRegressor(
