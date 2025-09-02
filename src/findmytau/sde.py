@@ -27,6 +27,7 @@ class SDE:
         self.X[0, :] = self.x0
 
         self.alpha: list[float] = [0.05, 0.5, 0.95]
+        self.stopping_times = np.full(self.N, self.M, dtype=int)
 
     def simulate(self):
 
@@ -75,5 +76,11 @@ class SDE:
             exercise_payoff = np.maximum(1.0 - self.X[t, item], 0.0)
             exercise = exercise_payoff >= C
             V[item] = np.where(exercise, exercise_payoff, V[item])
+
+            self.stopping_times[item] = np.where(
+                exercise & (self.stopping_times[item] == self.M),
+                t,
+                self.stopping_times[item]
+            )
 
         return np.mean(V)
