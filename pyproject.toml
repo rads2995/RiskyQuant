@@ -9,7 +9,6 @@ dependencies = [
   "cmake >= 4.1.0",
   "ninja >= 1.13.0",
   "numpy >= 2.3.2",
-  "scikit-learn >= 1.7.1",
   "matplotlib >= 3.10.6",
 ]
 requires-python = ">=3.11"
@@ -53,5 +52,5 @@ build-dir = "build/{wheel_tag}"
 build.tool-args = ["-j6"]
 
 [tool.scikit-build.cmake.define]
-# 2.1.4 Patch Release: SYCL plugin only supports inference not training
-PLUGIN_SYCL = "OFF"
+USE_HIP = "ON"
+CMAKE_HIP_ARCHITECTURES = "gfx1010"

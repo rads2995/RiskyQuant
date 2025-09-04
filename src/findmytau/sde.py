@@ -1,60 +1,54 @@
-import numpy as np
-import numpy.typing as npt
+import cupy as cp
 import xgboost as xgb
-from sklearn.model_selection import train_test_split
 
 class SDE:
     def __init__(
         self,
-        N: int = 10000,
-        M: int = 1000,
-        mu: float = 0.05,
-        sigma: float = 0.2,
-        x0: float = 1.0,
-        T: float = 1.0
+        N: cp.int64 = 10000,
+        M: cp.int64 = 1000,
+        mu: cp.float64 = 0.05,
+        sigma: cp.float64 = 0.2,
+        x0: cp.float64 = 1.0,
+        T: cp.float64 = 1.0
     ):
-        self.N: int = N
-        self.M: int = M
+        self.N: cp.int64 = N
+        self.M: cp.int64 = M
         
-        self.mu: float = mu
-        self.sigma: float = sigma
-        self.x0: float = x0
+        self.mu: cp.float64 = mu
+        self.sigma: cp.float64 = sigma
+        self.x0: cp.float64 = x0
 
-        self.T: float = T
-        self.dt = self.T / self.M
+        self.T: cp.float64 = T
+        self.dt: cp.float64 = self.T / self.M
 
-        self.X: npt.NDArray[float] = np.zeros((self.M + 1, self.N), dtype=float)
+        self.X = cp.zeros((self.M + 1, self.N), dtype=cp.float64)
         self.X[0, :] = self.x0
 
-        self.alpha: list[float] = [0.05, 0.5, 0.95]
-        self.stopping_times = np.full(self.N, self.M, dtype=int)
+        self.alpha: list[cp.float64] = [0.05, 0.5, 0.95]
+        self.stopping_times = cp.full(self.N, self.M, dtype=cp.int64)
 
     def simulate(self):
 
-        rng = np.random.default_rng()
+        rng = cp.random.default_rng()
         for t in range(self.M):
-            dW_X = rng.normal(loc=0.0, scale=np.sqrt(self.dt), size=self.N)
-            self.X[t + 1, :] = self.X[t, :] * np.exp((self.mu - 0.5 * self.sigma**2) * self.dt + self.sigma * dW_X)
+            dW_X = rng.standard_normal(size=self.N, dtype=cp.float64) * cp.sqrt(self.dt)
+            self.X[t + 1, :] = self.X[t, :] * cp.exp((self.mu - 0.5 * self.sigma**2) * self.dt + self.sigma * dW_X)
 
     def optimal_stopping(self):
-
-        V = np.maximum(1.0 - self.X[-1, :], 0.0)
-        discount: float = np.exp(-0.05 * self.dt)
+        
+        V: cp.float64 = cp.maximum(1.0 - self.X[-1, :], 0.0)
+        discount: cp.float64 = cp.exp(-0.05 * self.dt)
 
         for t in range(self.M - 1, -1, -1):
             item = (1.0 - self.X[t, :]) > 0.0
-            if not np.any(item):
+            if not cp.any(item):
                 continue
             
-            features = self.X[t, item].reshape(-1, 1)
+            features = self.X[t, item].reshape(-1, 1)            
             Y = discount * V[item]
 
-            X_train, X_test, Y_train, Y_test = train_test_split(
-                features, Y, test_size=0.2, random_state=42
-            )
-            
-            dtrain = xgb.QuantileDMatrix(X_train, Y_train)
-            dtest = xgb.QuantileDMatrix(X_test, Y_test, ref=dtrain)
+            # TODO: pass cupy arrays directly once rocm's xgboost is updated
+            dtrain = xgb.QuantileDMatrix(features.get(), Y.get())
 
             model = xgb.train(
                 {
@@ -63,24 +57,24 @@ class SDE:
                 "quantile_alpha": self.alpha,
                 "learning_rate": 0.04,
                 "max_depth": 5,
-                "device": "cpu"
+                "device": "gpu"
                 },
                 dtrain,
-                num_boost_round=32,
-                early_stopping_rounds=2,
-                evals=[(dtrain, "Train"), (dtest, "Test")]
+                num_boost_round=32
             )
 
-            C = model.inplace_predict(features)[:, 1]
+            # TODO: inplace predict supports cupy arrays on recent versions
+            dfeatures = xgb.DMatrix(features.get())
+            C = cp.asarray(model.predict(dfeatures)[:, 1])
 
-            exercise_payoff = np.maximum(1.0 - self.X[t, item], 0.0)
+            exercise_payoff = cp.maximum(1.0 - self.X[t, item], 0.0)
             exercise = exercise_payoff >= C
-            V[item] = np.where(exercise, exercise_payoff, V[item])
+            V[item] = cp.where(exercise, exercise_payoff, V[item])
 
-            self.stopping_times[item] = np.where(
+            self.stopping_times[item] = cp.where(
                 exercise & (self.stopping_times[item] == self.M),
                 t,
                 self.stopping_times[item]
             )
 
-        return np.mean(V)
+        return cp.mean(V)
