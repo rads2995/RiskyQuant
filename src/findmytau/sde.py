@@ -7,7 +7,7 @@ class SDE:
         N: cp.int64 = 10000,
         M: cp.int64 = 1000,
         mu: cp.float64 = 0.05,
-        sigma: cp.float64 = 0.2,
+        sigma: cp.float64 = 0.3,
         x0: cp.float64 = 1.0,
         T: cp.float64 = 1.0
     ):
@@ -24,7 +24,7 @@ class SDE:
         self.X = cp.zeros((self.M + 1, self.N), dtype=cp.float64)
         self.X[0, :] = self.x0
 
-        self.alpha: list[cp.float64] = [0.05, 0.5, 0.95]
+        self.alpha: cp.float64 = 0.5
         self.stopping_times = cp.full(self.N, self.M, dtype=cp.int64)
 
     def simulate(self):
@@ -41,14 +41,19 @@ class SDE:
 
         for t in range(self.M - 1, -1, -1):
             item = (1.0 - self.X[t, :]) > 0.0
+            
+            V = discount * V
+            
             if not cp.any(item):
                 continue
             
             features = self.X[t, item].reshape(-1, 1)            
-            Y = discount * V[item]
+            Y = V[item]
 
             # TODO: pass cupy arrays directly once rocm's xgboost is updated
             dtrain = xgb.QuantileDMatrix(features.get(), Y.get())
+
+            evals = [(dtrain, 'train')]
 
             model = xgb.train(
                 {
@@ -60,19 +65,21 @@ class SDE:
                 "device": "gpu"
                 },
                 dtrain,
-                num_boost_round=32
+                num_boost_round=64,
+                evals=evals,
+                early_stopping_rounds=5
             )
 
             # TODO: inplace predict supports cupy arrays on recent versions
             dfeatures = xgb.DMatrix(features.get())
-            C = cp.asarray(model.predict(dfeatures)[:, 1])
+            C = cp.asarray(model.predict(dfeatures))
 
             exercise_payoff = cp.maximum(1.0 - self.X[t, item], 0.0)
             exercise = exercise_payoff >= C
             V[item] = cp.where(exercise, exercise_payoff, V[item])
 
             self.stopping_times[item] = cp.where(
-                exercise & (self.stopping_times[item] == self.M),
+                exercise & (self.stopping_times[item] > t),
                 t,
                 self.stopping_times[item]
             )

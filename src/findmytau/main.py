@@ -11,11 +11,11 @@ def main():
     plt.figure(figsize=(10,6))
     for i in range(20):
         path = sde.X[:, i]
-        plt.plot(np.linspace(0, sde.T, sde.M+1), path, lw=1, alpha=0.7)
+        plt.plot(np.linspace(0, sde.T, sde.M+1), path.get(), lw=1, alpha=0.7)
         
         # mark the stopping point with a red dot
-        t_stop = sde.stopping_times[i]
-        plt.scatter(t_stop * sde.dt, path[t_stop], color="red", zorder=3)
+        t_stop = sde.stopping_times[i].get()
+        plt.scatter(t_stop * sde.dt, path[t_stop].get(), color="red", zorder=3)
 
     plt.axhline(1.0, color="black", ls="--", lw=1)  # strike boundary
     plt.title("Sample Trajectories with Optimal Stopping Decisions")
